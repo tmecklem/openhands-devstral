@@ -6,13 +6,17 @@ services:
       context: .
       dockerfile: Dockerfile.devstral
     ports:
-      - "5000:5000"
+      - "5001:5001"
     environment:
       - MODEL_PATH=/app/models
       - TENSOR_PARALLEL_SIZE=2
       - HOST=0.0.0.0
-      - PORT=5000
+      - PORT=5001
       - MAX_MODEL_LEN=16000
+      - QUANTIZATION=compressed-tensors
+      - NCCL_SHM_DISABLE=1
+      - NCCL_P2P_DISABLE=1
+      - NCCL_IB_DISABLE=1
     volumes:
       - ./models:/app/models
     deploy:
@@ -25,15 +29,19 @@ services:
     restart: unless-stopped
     
   openhands:
-    build:
-      context: .
-      dockerfile: Dockerfile.openhands
+    image: docker.all-hands.dev/all-hands-ai/openhands:0.39
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ~/.openhands-state:/.openhands-state
-      - ./workspace:/workspace
+      - ./openhands-state:/.openhands-state
+    environment:
+      - SANDBOX_RUNTIME_CONTAINER_IMAGE=docker.all-hands.dev/all-hands-ai/runtime:0.39-nikolaik
+      - LOG_ALL_EVENTS=true
+      - SANDBOX_VOLUMES=./workspace:/workspace:rw
+      - LLM_MODEL=openai/Devstral-Small-2505-fp8
+      - LLM_BASE_URL=http://vllm:5001/v1
+      - LLM_API_KEY=token-abc123
     ports:
-      - "3000:3000"
+      - "5000:3000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped 

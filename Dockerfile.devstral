@@ -17,55 +17,26 @@ COPY ./devstral_chat_template.jinja /app/src/
 
 # Set environment variables for CUDA optimization
 ENV CUDA_VISIBLE_DEVICES=0,1
-ENV NCCL_P2P_DISABLE=1
-ENV NCCL_IB_DISABLE=1
-
-# Create a startup script
-RUN <<EOF cat > /app/start_vllm.sh
-#!/bin/bash
-
-# Default values
-MODEL_PATH=\${MODEL_PATH:-"/app/models"}
-TENSOR_PARALLEL_SIZE=\${TENSOR_PARALLEL_SIZE:-2}
-HOST=\${HOST:-"0.0.0.0"}
-PORT=\${PORT:-8003}
-API_KEY=\${API_KEY:-"token-abc123"}
-GPU_MEMORY_UTIL=\${GPU_MEMORY_UTIL:-0.85}
-MAX_MODEL_LEN=\${MAX_MODEL_LEN:-16000}
-MAX_NUM_SEQS=\${MAX_NUM_SEQS:-1}
-CHAT_TEMPLATE=\${CHAT_TEMPLATE:-"/app/src/devstral_chat_template.jinja"}
-
-echo "Starting vLLM with the following configuration:"
-echo "Model: \$MODEL_PATH"
-echo "Tensor Parallel Size: \$TENSOR_PARALLEL_SIZE"
-echo "GPU Memory Utilization: \$GPU_MEMORY_UTIL"
-echo "Max Model Length: \$MAX_MODEL_LEN"
-echo "Max Sequences: \$MAX_NUM_SEQS"
-
-python -m vllm.entrypoints.openai.api_server \\
-    --model "\$MODEL_PATH" \\
-    --tensor-parallel-size "\$TENSOR_PARALLEL_SIZE" \\
-    --served-model-name Devstral-Small-2505-fp8 \\
-    --host "\$HOST" \\
-    --port "\$PORT" \\
-    --api-key "\$API_KEY" \\
-    --enable-prefix-caching \\
-    --gpu-memory-utilization="\$GPU_MEMORY_UTIL" \\
-    --max-model-len "\$MAX_MODEL_LEN" \\
-    --max-num-seqs "\$MAX_NUM_SEQS" \\
-    --chat-template "\$CHAT_TEMPLATE" \\
-    --tokenizer-mode mistral
-EOF
-
-# Make the script executable
-RUN chmod +x /app/start_vllm.sh
 
 # Expose the port
-EXPOSE 8003
+EXPOSE 5001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8003/health || exit 1
+    CMD curl -f http://localhost:5001/health || exit 1
 
-# Default command
-CMD ["/app/start_vllm.sh"]
+# Use the vLLM entrypoint but provide our custom arguments
+CMD ["--model", "/app/models", \
+     "--tensor-parallel-size", "2", \
+     "--served-model-name", "Devstral-Small-2505-fp8", \
+     "--host", "0.0.0.0", \
+     "--port", "5001", \
+     "--api-key", "token-abc123", \
+     "--enable-prefix-caching", \
+     "--gpu-memory-utilization", "0.85", \
+     "--max-model-len", "16000", \
+     "--max-num-seqs", "1", \
+     "--chat-template", "/app/src/devstral_chat_template.jinja", \
+     "--tokenizer-mode", "mistral", \
+     "--enforce-eager", \
+     "--quantization", "compressed-tensors"]
