@@ -1,0 +1,39 @@
+version: '3'
+
+services:
+  vllm:
+    build:
+      context: .
+      dockerfile: Dockerfile.devstral
+    ports:
+      - "5000:5000"
+    environment:
+      - MODEL_PATH=/app/models
+      - TENSOR_PARALLEL_SIZE=2
+      - HOST=0.0.0.0
+      - PORT=5000
+      - MAX_MODEL_LEN=16000
+    volumes:
+      - ./models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 2
+              capabilities: [gpu]
+    restart: unless-stopped
+    
+  openhands:
+    build:
+      context: .
+      dockerfile: Dockerfile.openhands
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ~/.openhands-state:/.openhands-state
+      - ./workspace:/workspace
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped 
